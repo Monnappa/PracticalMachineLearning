@@ -4,27 +4,250 @@ author: "Monnappa Somanna"
 date: "October 31, 2016"
 output: html_document
 ---
+## 1 Introduction
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+The objective of this project is to predict the manner in which people did the
+exercise,i.e., Class A to E.
+
+In this project, we will be to use data from accelerometers on the belt, 
+forearm, arm, and dumbell of 6 participant They were asked to perform barbell 
+lifts correctly and incorrectly in 5 different ways. The five ways are exactly
+according to the specification (Class A), throwing the elbows to the front 
+(Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell
+only halfway (Class D) and throwing the hips to the front (Class E).
+Only Class A corresponds to correct performance
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit is now possible 
+to collect a large amount of data about personal activity relatively 
+inexpensively. These type of devices are part of the quantified self 
+movement - a group of enthusiasts who take measurements about themselves
+regularly to improve their health, to find patterns in their behavior, 
+or because they are tech geeks. One thing that people regularly 
+do is quantify how much of a particular activity they do, 
+but they rarely quantify how well they do it
+
+
+## 2 Data
+
+### 2.1 Data collection
+we will cllect the data from personal activity monitoring devices like 
+accelerometers on the belt, forearm, arm, and dumbell of 6 participant 
+They were asked to perform barbell lifts correctly and incorrectly 
+in 5 different ways.
+
+
+### 2.2 Cases
+
+There are 6 aprticipants in the survey and toal observations 19622 
+and 60 variables in this dataset.
+
+More information is available from the website here:
+http://groupware.les.inf.puc-rio.br/har 
+(see the section on the Weight Lifting Exercise Dataset
+
+### 2.3 Variables
+
+Following key variables are to be extracted from the Dataset:
+
+The five ways are exactly according to the specification (Class A),
+throwing the elbows to the front (Class B), lifting the dumbbell only halfway
+(Class C), lowering the dumbbell only halfway (Class D) and throwing the hips
+to the front (Class E). Only Class A corresponds to correct performance
+
+Training Set: 19622 Observations of 160 Variables
+Testing Set: 20 Observations of 160 Variables
+
+### 2.4 Data Citation
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative
+Activity Recognition of Weight Lifting Exercises. 
+Proceedings of 4th International Conference in Cooperation 
+with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013
+
+http://groupware.les.inf.puc-rio.br/har
+
+## 3 Exploratory data analysis
+
+### 3.1 Data Preparation
+Load the required Packages in R
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+library(caret); library(rattle); library(rpart); library(rpart.plot)
+library(randomForest); 
+# repmis package has utilities for Reproducible Research
+library(repmis)
 ```
 
-## R Markdown
+Loading the Data set using R
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+# load data locally
+  training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+  testing <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+```
+Training Set: 19622 Observations of 160 Variables
+Testing Set: 20 Observations of 160 Variables
+In this exercise we will be predicting the outcome of the exercise
+(20 Observations) in the Testing Test using the Data in Training set
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Cleaning the Data - Remove missing values
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 
-```{r cars}
-summary(cars)
+# Remove NAs and missing values from the Training and Testing Data set
+
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+
+# As we explore the Dataset we observe that first few varibales are Identifiers 
+#and they will not #have any predective powers, Hence removing the first few 
+#columns to keep the data tidy and simple
+#for the Analysis
+
+trainData <- training[, -c(1:5)]
+testData <- testing[, -c(1:5)]
+```
+Now the updated Data has 55 Variables and 19622 observations in the Training Set
+and 20 observations in the Test set.
+
+
+### 3.2 Splitting the Data in to Training Set and Validation Set
+
+It is important to compute Out of sample error in the Data set to avoid over 
+fitting. Hence, we further split the Training set into 70% Training set and 30%
+Validation set.
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# Setting the seed to ensure reproducibility of the Data
+set.seed(1234) 
+inTrain <- createDataPartition(trainData$classe, p = 0.7, list = FALSE)
+train <- trainData[inTrain, ]
+valid <- trainData[-inTrain, ]
 ```
 
-## Including Plots
+## 4.1 Setting up the Prediction Algorithm for the Dataset
 
-You can also embed plots, for example:
+### 4.1.1 Using Classification Trees and Random Forests to Predict the Outcome
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+Classification trees:
+As the name implies are used to separate the dataset into
+classes belonging to the response variable. Usually the response variable has
+two classes: Yes or No (1 or 0).For binary splits however, the standard
+CART procedure is used.Thus classification trees are used when the response or
+target variable is categorical in nature.
+
+Random Forest: 
+Random Foest Algorithms can deal with "small n large p"-problems, high-order
+interactions, correlated predictor variables. These are used not only for 
+prediction, but also to assess variable importance
+
+### 4.1.2 Classification Tree
+
+We shall consider 5 fold cross validation for the classification Tree to save
+computing time default setting will be 10.
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# Create a classification Tree using the method "rpart"
+
+control <- trainControl(method = "cv", number = 5)
+
+fit_rpart <- train(classe ~ ., data = train, method = "rpart", 
+                   trControl = control)
+
+print(fit_rpart, digits = 4)
+#Accuracy was used to select the optimal model using  the largest value.
+#The final value used for the model was cp = 0.03723
+
+fancyRpartPlot(fit_rpart$finalModel)
+
+# predict outcomes using validation set
+predict_rpart <- predict(fit_rpart, valid)
+
+# Show prediction result
+(conf_rpart <- confusionMatrix(valid$classe, predict_rpart))
+
+(accuracy_rpart <- conf_rpart$overall[1])
+
+```
+Interpretation of the Results:
+From the confusion matrix, the accuracy rate is 0.49, and so the out-of-sample
+error rate is 0.51 Using classification tree does not predict the outcome 
+classe very well. 
+Let's explore random forest method to see if that performs at better accuracy.
+
+
+### 4.1.3 Random Forest Method
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# Create a Prediction using Random Forest "rf"
+
+fit_rf <- train(classe ~ ., data = train, method = "rf", 
+                   trControl = control)
+
+print(fit_rf, digits = 4)
+
+# predict outcomes using validation set
+predict_rf <- predict(fit_rf, valid)
+
+# Show prediction result
+(conf_rf <- confusionMatrix(valid$classe, predict_rf))
+
+```
+Interpretation of the Results:
+As we can see from the Consusion Matrix, The prediction accuracy using this 
+method is 0.998
+and the out of sample error for this classification is 0.01 which is way 
+better than the coin toss accuracy we got from Decision
+
+
+###5. Prediction on Testing Set
+
+We shall use Random Forest Method to Predict the Outcome since Random forest
+gives better Predective accuracy compared to Classification Trees
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+(predict(fit_rf, testData))
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## 6.Reflection
+
+The source data, contained about 60 Variables and 19622 observations. 
+we started by in depth understanding the individual variable and created
+Training and Validation Set and explored Classification Tree and Random 
+Forests Method to Predict the Outcome
+
+It was bit challenging to shortlist the next best variable which are impacting
+the Prediction since the Data set contains 60 variables covering various aspects
+of life. Hence, I excluded inital few variables which will not contribute to 
+the predetive power. This has resulted in comparing multiple variables in the
+Analysis
+
+Some limitations of this Analysis include cleanlisness  of the data. Given that
+the data is coming from multiple devices simultaeneosuly there is a chance for
+biases.
+
+To investigate this data further, I would be interested in deep diving in
+to each of the Data sets and explore in detail abou the key variables 
+contributing to the Outcome by using Principal Component Analysis also try 
+Ensemble Modeling for further improvement in accuracy.
+
+## 7.References
+
+### 7.1 Data reference
+More information is available from the website here: 
+http://groupware.les.inf.puc-rio.br/har (see the section on the Weight 
+Lifting Exercise Dataset
+
+
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4Od7a4ILt
+
+### 7.2 Other references
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative
+Activity Recognition of Weight Lifting Exercises. Proceedings of 4th
+International Conference in Cooperation with SIGCHI (Augmented Human '13) 
+. Stuttgart, Germany: ACM SIGCHI, 2013
+
+Reproducible Research course from John Hopkins University
+
+Data Analysis and Statistical Inference
+?etinkaya-Rundel Mine (2012), OpenIntro
+Statistics, Second Edition, URL: http://www.openintro.org/stat/textbook.php.
